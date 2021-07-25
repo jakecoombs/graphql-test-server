@@ -8,6 +8,7 @@ import { ApolloServer } from "apollo-server-express";
 import { buildSchema } from "type-graphql";
 import { PostResolver } from "./resolvers/post";
 import { UserResolver } from "./resolvers/user";
+import { ApolloServerPluginLandingPageGraphQLPlayground } from "apollo-server-core";
 import redis from "redis";
 import session from "express-session";
 import connectRedis from "connect-redis";
@@ -59,6 +60,7 @@ const main = async () => {
       resolvers: [PostResolver, UserResolver],
       validate: false,
     }),
+    plugins: [ApolloServerPluginLandingPageGraphQLPlayground()],
     context: ({ req, res }): MyContext => ({ em: orm.em, req, res }),
   });
 
@@ -67,7 +69,7 @@ const main = async () => {
   apolloServer.applyMiddleware({ app, cors: false });
 
   app.listen(4000, () => {
-    console.log("Server started on http://localhost:4000");
+    console.log("Server started on http://localhost:4000/graphql");
   });
 };
 
