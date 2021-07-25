@@ -1,3 +1,4 @@
+import { EntityManager } from "@mikro-orm/postgresql";
 import { User } from "./../entities/User";
 import {
   Resolver,
@@ -39,7 +40,6 @@ export class UserResolver {
   @Query(() => User, { nullable: true })
   async me(@Ctx() { em, req }: MyContext) {
     // user not logged in
-    console.log(req.session);
     if (!req.session.userId) {
       return null;
     }
@@ -76,9 +76,19 @@ export class UserResolver {
     }
 
     const hashedPassword = await argon2.hash(password);
-    const user = em.create(User, { username, password: hashedPassword });
+    let user;
     try {
-      await em.persistAndFlush(user);
+      const result = await (em as EntityManager)
+        .createQueryBuilder(User)
+        .getKnexQuery()
+        .insert({
+          username: username,
+          password: hashedPassword,
+          created_at: new Date(),
+          updated_at: new Date(),
+        })
+        .returning("*");
+      user = result[0];
     } catch (err) {
       if (err.code === "23505" || err.detail.includes("already exists")) {
         // Duplicate username
@@ -91,7 +101,6 @@ export class UserResolver {
           ],
         };
       }
-      console.log(err.message);
     }
 
     req.session!.userId = user.id;
