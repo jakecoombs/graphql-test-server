@@ -16,7 +16,10 @@ import cors from "cors";
 
 const main = async () => {
   const orm = await MikroORM.init(microConfig);
+  /* await orm.em.nativeDelete(User, {});
+  await orm.em.nativeDelete(Post, {}); wipe data */
   await orm.getMigrator().up();
+
   const app = express();
 
   const RedisStore = connectRedis(session);

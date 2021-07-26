@@ -1,3 +1,4 @@
+import { validateRegister } from "./../utils/validateRegister";
 import { COOKIE_NAME } from "./../constants";
 import { EntityManager } from "@mikro-orm/postgresql";
 import { User } from "./../entities/User";
@@ -12,6 +13,7 @@ import {
 } from "type-graphql";
 import { MyContext } from "src/types";
 import argon2 from "argon2";
+import { UsernamePasswordInput } from "./UsernamePasswordInput";
 
 @ObjectType()
 class FieldError {
@@ -48,42 +50,31 @@ export class UserResolver {
     return await em.findOne(User, { id: req.session.userId });
   }
 
+  @Mutation(() => Boolean)
+  async forgotPassword(@Arg("email") email: string, @Ctx() { em }: MyContext) {
+    /* const user = await em.findOne(User, { email }); */
+    return true;
+  }
+
   @Mutation(() => UserResponse)
   async register(
-    @Arg("username") username: string,
-    @Arg("password") password: string,
+    @Arg("options") options: UsernamePasswordInput,
     @Ctx() { em, req }: MyContext
   ): Promise<UserResponse> {
-    if (username.length <= 2) {
-      return {
-        errors: [
-          {
-            field: "username",
-            message: "Username must be longer than 2 characters",
-          },
-        ],
-      };
+    const errors = validateRegister(options);
+    if (errors) {
+      return { errors };
     }
 
-    if (password.length <= 2) {
-      return {
-        errors: [
-          {
-            field: "password",
-            message: "Password must be longer than 2 characters",
-          },
-        ],
-      };
-    }
-
-    const hashedPassword = await argon2.hash(password);
+    const hashedPassword = await argon2.hash(options.password);
     let user;
     try {
       const result = await (em as EntityManager)
         .createQueryBuilder(User)
         .getKnexQuery()
         .insert({
-          username: username,
+          username: options.username,
+          email: options.email,
           password: hashedPassword,
           created_at: new Date(),
           updated_at: new Date(),
@@ -111,11 +102,16 @@ export class UserResolver {
 
   @Mutation(() => UserResponse)
   async login(
-    @Arg("username") username: string,
+    @Arg("usernameOrEmail") usernameOrEmail: string,
     @Arg("password") password: string,
     @Ctx() { em, req }: MyContext
   ): Promise<UserResponse> {
-    const user = await em.findOne(User, { username });
+    const user = await em.findOne(
+      User,
+      usernameOrEmail.includes("@")
+        ? { email: usernameOrEmail }
+        : { username: usernameOrEmail }
+    );
     if (!user) {
       return {
         errors: [
